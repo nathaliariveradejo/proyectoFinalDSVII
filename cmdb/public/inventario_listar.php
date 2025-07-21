@@ -3,207 +3,816 @@ require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/../models/Inventario.php';
 
 $model = new Inventario();
+
+$categoria = $_GET['categoria'] ?? '';
+$verDepreciados = isset($_GET['filtro_depreciacion']) && $_GET['filtro_depreciacion'] === '1';
+
 $items = $model->listar();
+
+if ($categoria !== '') {
+    $items = array_filter($items, function($i) use ($categoria) {
+        return isset($i['categoria']) && $i['categoria'] === $categoria;
+    });
+}
+
+if ($verDepreciados) {
+    $items = array_filter($items, function ($i) {
+        if (empty($i['fechaIngreso']) || empty($i['costo']) || empty($i['depreciacionMeses'])) {
+            return false;
+        }
+        $ingreso  = new DateTime($i['fechaIngreso']);
+        $hoy      = new DateTime();
+        $meses    = ($hoy->diff($ingreso)->y * 12) + $hoy->diff($ingreso)->m;
+        $acumulada = $i['depreciacionMeses'] * $meses;
+        return $i['costo'] > 0 && ($acumulada / $i['costo']) * 100 >= 90;
+    });
+}
 ?>
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventario - CMDB</title>
-    <link rel="stylesheet" href="css/estilo.css">
+    <title>Inventario - TechSolutions</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
         :root {
-            --primary-blue: #1e88e5;
-            --light-blue: #90caf9;
-            --dark-blue: #0d47a1;
-            --primary-green: #66bb6a;
-            --light-green: #a5d6a7;
-            --background-light: #f0f8ff;
-            --background-white: #ffffff;
-            --text-dark: #263238;
-            --text-light: #eceff1;
-            --error-color: #e53935;
-            --success-color: #43a047;
-            --table-header: #e3f2fd;
-            --table-row-even: #f5f5f5;
-            --table-row-hover: #e1f5fe;
+            --primary: #1e88e5;
+            --primary-dark: #1565c0;
+            --secondary: #0d47a1;
+            --light: #e3f2fd;
+            --dark: #1a237e;
+            --gray: #f5f5f5;
+            --text: #333;
+            --white: #ffffff;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            --success: #43a047;
+            --error: #e53935;
+            --warning: #ff9800;
         }
-
-        .dashboard-container {
-            background-color: var(--background-white);
-            padding: 2rem;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-            margin: 2rem auto;
+        
+        body {
+            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+        
+        .container {
             max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
         }
-
+        
+        /* Header Styles */
+        header {
+            background: linear-gradient(to right, var(--primary), var(--dark));
+            color: var(--white);
+            box-shadow: var(--shadow);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .logo-icon {
+            font-size: 28px;
+            background: var(--white);
+            color: var(--primary);
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        
+        .logo-text {
+            font-size: 24px;
+            font-weight: 700;
+        }
+        
+        .logo-text span {
+            font-weight: 300;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        
+        .logout-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            padding: 8px 15px;
+            border-radius: 30px;
+            color: var(--white);
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .logout-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        
+        /* Menu Horizontal */
+        .menu-horizontal {
+            background: var(--white);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .menu-horizontal ul {
+            display: flex;
+            list-style: none;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .menu-horizontal li {
+            padding: 0;
+        }
+        
+        .menu-horizontal a {
+            display: block;
+            padding: 18px 25px;
+            color: var(--text);
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s;
+            position: relative;
+        }
+        
+        .menu-horizontal a:hover, .menu-horizontal a.active {
+            color: var(--primary);
+            background: rgba(30, 136, 229, 0.05);
+        }
+        
+        .menu-horizontal a.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: var(--primary);
+        }
+        
+        /* Dashboard Content */
+        .dashboard {
+            padding: 30px 0;
+        }
+        
+        .dashboard-container {
+            background: var(--white);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow);
+        }
+        
+        .section-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--light);
+        }
+        
+        .section-title h2 {
+            color: var(--dark);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        /* Filtros y Botones */
+        .filters-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 25px;
+            padding: 20px;
+            background: var(--light);
+            border-radius: 10px;
+        }
+        
+        .filter-group {
+            flex: 1;
+            min-width: 250px;
+        }
+        
+        .filter-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--dark);
+        }
+        
+        .filter-group select {
+            width: 100%;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: var(--white);
+            font-size: 16px;
+        }
+        
+        .checkbox-filter {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: var(--white);
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+        
+        .checkbox-filter input {
+            width: 18px;
+            height: 18px;
+        }
+        
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: var(--white);
+        }
+        
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .btn-success {
+            background: var(--success);
+            color: var(--white);
+        }
+        
+        .btn-success:hover {
+            background: #388e3c;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .actions-container {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-bottom: 25px;
+        }
+        
+        /* Tabla con Scroll Horizontal */
+        .table-container {
+            overflow-x: auto;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            margin-top: 20px;
+            padding: 2px;
+        }
+        
         .table-listar {
             width: 100%;
             border-collapse: collapse;
-            margin: 1.5rem 0;
+            margin: 0;
             font-size: 0.95rem;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            border-radius: 8px;
-            overflow: hidden;
+            min-width: 1200px; /* Ancho mínimo para garantizar scroll */
         }
-
+        
         .table-listar th, .table-listar td {
-            padding: 1rem;
+            padding: 1.2rem 1rem;
             text-align: left;
             border-bottom: 1px solid #e0e0e0;
+            vertical-align: middle;
+            white-space: nowrap;
         }
-
+        
         .table-listar th {
-            background-color: var(--table-header);
-            color: var(--dark-blue);
+            background-color: var(--light);
+            color: var(--dark);
             font-weight: 600;
             text-transform: uppercase;
-            font-size: 0.85rem;
+            font-size: 0.9rem;
             letter-spacing: 0.5px;
+            position: sticky;
+            top: 0;
         }
-
+        
         .table-listar tr:nth-child(even) {
-            background-color: var(--table-row-even);
+            background-color: #f9f9f9;
         }
-
+        
         .table-listar tr:hover {
-            background-color: var(--table-row-hover);
+            background-color: #f0f7ff;
         }
-
+        
         .actions {
             display: flex;
-            gap: 0.8rem;
+            gap: 8px;
+            flex-wrap: nowrap;
+            justify-content: flex-start;
         }
-
-        .btn {
-            padding: 0.5rem 1rem;
+        
+        .btn-sm {
+            padding: 6px 12px;
             border-radius: 6px;
-            font-size: 0.85rem;
+            font-size: 14px;
             font-weight: 500;
             cursor: pointer;
             transition: all 0.3s ease;
             text-decoration: none;
             display: inline-flex;
             align-items: center;
-            gap: 0.3rem;
+            gap: 5px;
+            white-space: nowrap;
         }
-
+        
         .btn-edit {
-            background-color: var(--light-blue);
-            color: var(--dark-blue);
+            background: #e3f2fd;
+            color: var(--primary);
+            border: 1px solid #bbdefb;
         }
-
+        
         .btn-edit:hover {
-            background-color: var(--primary-blue);
+            background: var(--primary);
             color: white;
+            border-color: var(--primary);
         }
-
+        
         .btn-delete {
-            background-color: #ffcdd2;
-            color: var(--error-color);
+            background: #ffebee;
+            color: var(--error);
+            border: 1px solid #ffcdd2;
         }
-
+        
         .btn-delete:hover {
-            background-color: var(--error-color);
+            background: var(--error);
             color: white;
+            border-color: var(--error);
         }
-
-        .btn-add {
-            background-color: var(--light-green);
-            color: var(--success-color);
-            margin-bottom: 1.5rem;
+        
+        .btn-qr {
+            background: #e8f5e9;
+            color: var(--success);
+            border: 1px solid #c8e6c9;
         }
-
-        .btn-add:hover {
-            background-color: var(--primary-green);
+        
+        .btn-qr:hover {
+            background: var(--success);
             color: white;
+            border-color: var(--success);
         }
-
+        
         .empty-state {
             text-align: center;
-            padding: 2rem;
+            padding: 3rem;
             color: #666;
+            background: #f9f9f9;
+            border-radius: 10px;
+            margin-top: 20px;
         }
-
+        
         .empty-state p {
             margin-bottom: 1.5rem;
+            font-size: 1.1rem;
         }
-
+        
+        /* Estados */
         .status-available {
-            color: var(--success-color);
-            font-weight: 500;
+            color: var(--success);
+            font-weight: 600;
+            background: rgba(67, 160, 71, 0.1);
+            padding: 4px 10px;
+            border-radius: 20px;
+            display: inline-block;
         }
-
+        
         .status-discarded {
-            color: var(--error-color);
-            font-weight: 500;
+            color: var(--error);
+            font-weight: 600;
+            background: rgba(229, 57, 53, 0.1);
+            padding: 4px 10px;
+            border-radius: 20px;
+            display: inline-block;
         }
-
+        
+        .status-depreciated {
+            color: var(--warning);
+            font-weight: 600;
+            background: rgba(255, 152, 0, 0.1);
+            padding: 4px 10px;
+            border-radius: 20px;
+            display: inline-block;
+        }
+        
+        .foto-inventario {
+            width: 60px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 8px;
+            display: block;
+            border: 1px solid #ddd;
+        }
+        
+        .currency {
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+        }
+        
+        /* Footer */
+        footer {
+            background: var(--dark);
+            color: var(--white);
+            padding: 30px 0;
+            margin-top: 50px;
+        }
+        
+        .footer-container {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 30px;
+        }
+        
+        .footer-section {
+            flex: 1;
+            min-width: 250px;
+        }
+        
+        .footer-title {
+            font-size: 20px;
+            margin-bottom: 20px;
+            position: relative;
+            padding-bottom: 10px;
+        }
+        
+        .footer-title::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 50px;
+            height: 2px;
+            background: var(--primary);
+        }
+        
+        .footer-links {
+            list-style: none;
+        }
+        
+        .footer-links li {
+            margin-bottom: 12px;
+        }
+        
+        .footer-links a {
+            color: #bbdefb;
+            text-decoration: none;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .footer-links a:hover {
+            color: var(--white);
+            padding-left: 5px;
+        }
+        
+        .copyright {
+            text-align: center;
+            padding-top: 30px;
+            margin-top: 30px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            color: #90caf9;
+            font-size: 14px;
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 900px) {
+            .menu-horizontal ul {
+                flex-wrap: wrap;
+            }
+            
+            .filters-container {
+                flex-direction: column;
+            }
+        }
+        
         @media (max-width: 768px) {
-            .table-listar {
-                display: block;
-                overflow-x: auto;
+            .header-container {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .logo {
+                margin-bottom: 10px;
             }
             
             .actions {
                 flex-direction: column;
-                gap: 0.5rem;
+                gap: 8px;
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .menu-horizontal ul {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .menu-horizontal a {
+                padding: 12px 20px;
+            }
+            
+            .dashboard-container {
+                padding: 20px;
             }
         }
     </style>
 </head>
 <body>
-    <?php include __DIR__ . '/menu.php'; ?>
-
-    <div class="dashboard-container">
-        <h2>Listado de Inventario</h2>
-        
-        <a href="inventario_formulario.php" class="btn btn-add">➕ Añadir Equipo</a>
-
-        <?php if (empty($items)): ?>
-            <div class="empty-state">
-                <p>No hay elementos en el inventario.</p>
-                <a href="inventario_formulario.php" class="btn btn-add">➕ Añadir Primer Equipo</a>
+    <!-- Header -->
+    <header>
+        <div class="header-container container">
+            <div class="logo">
+                <div class="logo-icon">
+                    <i class="fas fa-microchip"></i>
+                </div>
+                <div class="logo-text">Tech<span>Solutions</span></div>
             </div>
-        <?php else: ?>
-            <table class="table-listar">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Equipo</th>
-                        <th>Marca</th>
-                        <th>Serie</th>
-                        <th>Ingreso</th>
-                        <th>Costo</th>
-                        <th>Estado</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($items as $i): ?>
-                        <tr>
-                            <td><?= htmlspecialchars($i['id']) ?></td>
-                            <td><?= htmlspecialchars($i['nombreEquipo']) ?></td>
-                            <td><?= htmlspecialchars($i['marca']) ?></td>
-                            <td><?= htmlspecialchars($i['serie']) ?></td>
-                            <td><?= htmlspecialchars($i['fechaIngreso']) ?></td>
-                            <td>$<?= number_format(htmlspecialchars($i['costo']), 2) ?></td>
-                            <td class="<?= $i['estado'] === 'disponible' ? 'status-available' : 'status-discarded' ?>">
-                                <?= htmlspecialchars($i['estado']) ?>
-                            </td>
-                            <td class="actions">
-                                <a href="inventario_formulario.php?id=<?= $i['id'] ?>" class="btn btn-edit">✏️ Editar</a>
-                                <a href="inventario_borrar.php?id=<?= $i['id'] ?>" 
-                                   class="btn btn-delete"
-                                   onclick="return confirm('¿Estás seguro de descartar este equipo?')">🗑️ Descartar</a>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        <?php endif; ?>
+            <div class="user-info">
+                <button class="logout-btn" onclick="window.location.href='logout.php'">
+                    <i class="fas fa-sign-out-alt"></i> Salir
+                </button>
+            </div>
+        </div>
+    </header>
+    
+    <!-- Navigation - Menú horizontal -->
+    <?php include __DIR__ . '/menu.php'; ?>
+    
+    <!-- Dashboard Content -->
+    <div class="dashboard container">
+        <div class="dashboard-container">
+            <div class="section-title">
+                <h2><i class="fas fa-boxes"></i> Listado de Inventario</h2>
+                <a href="inventario_formulario.php" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Añadir Equipo
+                </a>
+            </div>
+
+            <div class="actions-container">
+                <a href="exportar_excel.php?<?=
+                    http_build_query([
+                        'categoria' => $categoria,
+                        'filtro_depreciacion' => $verDepreciados ? '1' : '0'
+                    ])
+                ?>" class="btn btn-success">
+                    <i class="fas fa-file-excel"></i> Exportar a Excel
+                </a>
+            </div>
+
+            <form method="GET" id="filterForm" class="filters-container">
+            <div class="filter-group">
+                <label for="filtro_categoria">Filtrar por categoría:</label>
+                <select name="categoria" id="filtro_categoria">
+                <option value="" <?= $categoria === '' ? 'selected' : '' ?>>Todas las categorías</option>
+                <option value="Software" <?= $categoria === 'Software' ? 'selected' : '' ?>>Software</option>
+                <option value="Hardware" <?= $categoria === 'Hardware' ? 'selected' : '' ?>>Hardware</option>
+                <option value="Equipo de Red" <?= $categoria === 'Equipo de Red' ? 'selected' : '' ?>>Equipo de Red</option>
+                <option value="Equipo de Cómputo" <?= $categoria === 'Equipo de Cómputo' ? 'selected' : '' ?>>Equipo de Cómputo</option>
+                <option value="Equipo de Telefonía" <?= $categoria === 'Equipo de Telefonía' ? 'selected' : '' ?>>Equipo de Telefonía</option>
+                <option value="Licencia" <?= $categoria === 'Licencia' ? 'selected' : '' ?>>Licencia</option>
+                </select>
+            </div>
+
+            <div class="filter-group checkbox-filter">
+                <input type="checkbox"
+                    name="filtro_depreciacion"
+                    id="filtro_depreciacion"
+                    value="1"
+                    <?= $verDepreciados ? 'checked' : '' ?>>
+                <label for="filtro_depreciacion">Mostrar equipos al borde de la depreciación</label>
+            </div>
+            </form>
+            <script>
+            document.querySelectorAll('#filtro_categoria, #filtro_depreciacion')
+                .forEach(el => el.addEventListener('change', () => document.getElementById('filterForm').submit()));
+            </script>
+            <?php if (empty($items)): ?>
+                <div class="empty-state">
+                    <p>No hay elementos en el inventario.</p>
+                    <a href="inventario_formulario.php" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Añadir Primer Equipo
+                    </a>
+                </div>
+            <?php else: ?>
+                <div class="table-container">
+                    <form method="GET" id="filterForm">
+                        <input type="hidden" name="categoria" id="hidden_categoria" value="<?= htmlspecialchars($categoria) ?>">
+                        <input type="hidden" name="filtro_depreciacion" id="hidden_depreciacion" value="<?= $verDepreciados ? '1' : '0' ?>">
+                    </form>
+                    
+                    <table class="table-listar">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>EQUIPO</th>
+                                <th>MARCA</th>
+                                <th>SERIE</th>
+                                <th>INGRESO</th>
+                                <th>COSTO</th>
+                                <th>DEPRECIACIÓN</th>
+                                <th>CATEGORÍA</th>
+                                <th>ESTADO</th>
+                                <th>ASIGNADO A</th> <!-- Nueva columna aquí -->
+                                <th>COMENTARIO</th>
+                                <th>IMAGEN</th>
+                                <th>ACCIONES</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($items as $i): ?>
+                                <?php
+                                // Cálculo de depreciación
+                                $depreciacionActual = 0;
+                                $porcentajeDepreciacion = 0;
+                                $isDepreciated = false;
+
+                                if (!empty($i['fechaIngreso']) && !empty($i['depreciacionMeses'])) {
+                                    $fechaIngreso = new DateTime($i['fechaIngreso']);
+                                    $hoy = new DateTime();
+                                    $mesesTranscurridos = ($hoy->diff($fechaIngreso)->y * 12) + $hoy->diff($fechaIngreso)->m;
+                                    $depreciacionActual = $i['depreciacionMeses'] * $mesesTranscurridos;
+                                    if ($depreciacionActual > $i['costo']) {
+                                        $depreciacionActual = $i['costo'];
+                                    }
+                                    $porcentajeDepreciacion = ($depreciacionActual / $i['costo']) * 100;
+                                    $isDepreciated = $porcentajeDepreciacion >= 90;
+                                }
+
+                                $statusClass = $i['estado'] === 'disponible'
+                                    ? 'status-available'
+                                    : ($i['estado'] === 'donado' ? 'status-discarded' : 'status-discarded');
+
+                                if ($isDepreciated) {
+                                    $statusClass = 'status-depreciated';
+                                }
+                                ?>
+                                <tr>
+                                    <td><?= htmlspecialchars($i['id']) ?></td>
+                                    <td><?= htmlspecialchars($i['nombreEquipo']) ?></td>
+                                    <td><?= htmlspecialchars($i['marca']) ?></td>
+                                    <td><?= htmlspecialchars($i['serie']) ?></td>
+                                    <td><?= htmlspecialchars($i['fechaIngreso']) ?></td>
+                                    <td class="currency">$<?= number_format($i['costo'], 2) ?></td>
+                                    <td class="currency">$<?= number_format($depreciacionActual, 2) ?></td>
+                                    <td><?= htmlspecialchars($i['categoria'] ?? 'Sin categoría') ?></td>
+                                    <td>
+                                        <span class="<?= $statusClass ?>">
+                                            <?= htmlspecialchars($i['estado']) ?>
+                                            <?= $isDepreciated ? ' (Depreciado)' : '' ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <?php if ($i['estado'] === 'asignado'): ?>
+                                            <?= htmlspecialchars($i['nombre_colaborador'] ?? '—') ?>
+                                        <?php else: ?>
+                                            <span class="text-muted">—</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <div style="max-width: 200px; white-space: normal;">
+                                            <?= htmlspecialchars($i['comentario'] ?? '-') ?>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <?php if (!empty($i['imagen'])): ?>
+                                            <img src="img/<?= htmlspecialchars($i['imagen']) ?>"
+                                                alt="Imagen de <?= htmlspecialchars($i['nombreEquipo']) ?>" 
+                                                class="foto-inventario">
+                                        <?php else: ?>
+                                            <div class="foto-inventario" style="background: #f0f0f0; display: flex; align-items: center; justify-content: center;">
+                                                <i class="fas fa-camera" style="color: #ccc;"></i>
+                                            </div>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <div class="actions">
+                                            <a href="inventario_formulario.php?id=<?= $i['id'] ?>" class="btn-sm btn-edit">
+                                                <i class="fas fa-edit"></i> Editar
+                                            </a>
+                                            <a href="inventario_qr.php?id=<?= $i['id'] ?>" target="_blank" class="btn-sm btn-qr">
+                                                <i class="fas fa-qrcode"></i> QR
+                                            </a> 
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
+        </div>
     </div>
+    
+    <!-- Footer -->
+    <footer>
+        <div class="container footer-container">
+            <div class="footer-section">
+                <h3 class="footer-title">TechSolutions</h3>
+                <p>Especialistas en gestión de activos tecnológicos para empresas que buscan optimizar su infraestructura IT.</p>
+            </div>
+            
+            <div class="footer-section">
+                <h3 class="footer-title">Enlaces Rápidos</h3>
+                <ul class="footer-links">
+                    <li><a href="dashboard.php"><i class="fas fa-chevron-right"></i> Inicio</a></li>
+                    <li><a href="usuarios_listar.php"><i class="fas fa-chevron-right"></i> Usuarios</a></li>
+                    <li><a href="inventario_listar.php"><i class="fas fa-chevron-right"></i> Inventario</a></li>
+                    <li><a href="necesidades_listar.php"><i class="fas fa-chevron-right"></i> Solicitudes</a></li>
+                </ul>
+            </div>
+            
+            <div class="footer-section">
+                <h3 class="footer-title">Contacto</h3>
+                <ul class="footer-links">
+                    <li><a href="#"><i class="fas fa-map-marker-alt"></i> Panamá Norte, PTY</a></li>
+                    <li><a href="#"><i class="fas fa-phone"></i> (507) 268-0000</a></li>
+                    <li><a href="#"><i class="fas fa-envelope"></i> info@techsolutions.com</a></li>
+                    <li><a href="#"><i class="fas fa-clock"></i> Lunes-Viernes: 8am - 5pm</a></li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="copyright container">
+            &copy; 2025 TechSolutions - Gestión de Equipos Tecnológicos. Todos los derechos reservados.
+        </div>
+    </footer>
+
+    <script>
+        // Manejar cambio en el select de categoría
+        document.getElementById('filtro_categoria').addEventListener('change', function() {
+            document.getElementById('hidden_categoria').value = this.value;
+            document.getElementById('filterForm').submit();
+        });
+
+        // Manejar cambio en el checkbox de depreciación
+        document.getElementById('filtro_depreciacion').addEventListener('change', function() {
+            document.getElementById('hidden_depreciacion').value = this.checked ? '1' : '0';
+            document.getElementById('filterForm').submit();
+        });
+    </script>
 </body>
 </html>

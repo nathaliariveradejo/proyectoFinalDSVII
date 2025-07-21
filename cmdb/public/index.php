@@ -1,4 +1,8 @@
 <?php
+
+// Este archivo actúa como punto de entrada del sistema cuando se envía el formulario de login
+// Si las credenciales son correctas, inicia sesión y redirige al dashboard
+// Si no, redirige nuevamente al login con un mensaje de error
 session_start();
 require_once '../controllers/AuthController.php';
 
@@ -19,3 +23,5 @@ if (isset($_POST['login'])) {
 } else {
     header("Location: login.php");
 }
+
+?>

@@ -1,34 +1,31 @@
 <?php
+
+// Llamamos a la BD para comunicarnos con ella 
 require_once 'Conexion.php';
 
+// Creamos esta clase para manejar todo lo relacionado con los colaboradores
 class Colaborador
 {
     private $pdo;
 
+    // Al construir esta clase, conectamos automáticamente con la base de datos
     public function __construct()
     {
         $this->pdo = Conexion::conectar();
     }
 
-    /**
-     * Devuelve todos los colaboradores activos.
-     * @return array
-     */
+    // Con esta función listamos todos los colaboradores que estén activos
     public function listarActivos()
     {
-        $sql = "SELECT id, nombre, apellido, identificacion, ubicacion, telefono, correo 
-             FROM colaboradores 
-             WHERE estado = 'activo' 
-             ORDER BY id ASC";  
+        $sql = "SELECT id, nombre, apellido, identificacion, foto, ubicacion, telefono, correo 
+                FROM colaboradores 
+                WHERE estado = 'activo' 
+                ORDER BY id ASC";
         $stmt = $this->pdo->query($sql);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    /**
-     * Busca un colaborador por ID.
-     * @param int $id
-     * @return array|false
-     */
+    // Aquí buscamos un colaborador según su ID
     public function findById($id)
     {
         $sql = "SELECT * FROM colaboradores WHERE id = ? LIMIT 1";
@@ -37,22 +34,13 @@ class Colaborador
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
-    /**
-     * Inserta un nuevo colaborador.
-     * @param string $nombre
-     * @param string $apellido
-     * @param string $identificacion
-     * @param string $foto
-     * @param string $ubicacion
-     * @param string $telefono
-     * @param string $correo
-     * @return bool|string
-     */
+    // Con esta función guardamos un nuevo colaborador validando que los campos no estén vacíos antes de guardar
     public function guardar($nombre, $apellido, $identificacion, $foto = null, $ubicacion = null, $telefono = null, $correo = null)
     {
         if (empty($nombre) || empty($apellido) || empty($identificacion)) {
             return "Nombre, apellido e identificación son obligatorios.";
         }
+
         try {
             $sql = "INSERT INTO colaboradores 
                     (nombre, apellido, identificacion, foto, ubicacion, telefono, correo, estado) 
@@ -69,7 +57,7 @@ class Colaborador
             ]);
             return true;
         } catch (PDOException $e) {
-            // 23000: violación de clave única
+            // Si la identificación ya existe, capturamos el error
             if ($e->getCode() === '23000') {
                 return "La identificación ya está registrada.";
             }
@@ -77,19 +65,7 @@ class Colaborador
         }
     }
 
-    /**
-     * Actualiza un colaborador existente.
-     * @param int    $id
-     * @param string $nombre
-     * @param string $apellido
-     * @param string $identificacion
-     * @param string $foto
-     * @param string $ubicacion
-     * @param string $telefono
-     * @param string $correo
-     * @param string $estado          'activo' o 'inactivo'
-     * @return bool|string
-     */
+    // Aquí actualizamos los datos de un colaborador existente
     public function actualizar($id, $nombre, $apellido, $identificacion, $foto = null, $ubicacion = null, $telefono = null, $correo = null, $estado = 'activo')
     {
         try {
@@ -121,11 +97,7 @@ class Colaborador
         }
     }
 
-    /**
-     * Baja lógica (marcar como 'inactivo').
-     * @param int $id
-     * @return bool|string
-     */
+    // Esta función la usamos para dar de baja a un colaborador (solo se marca como: inactivo)
     public function bajaLogica($id)
     {
         try {
@@ -138,3 +110,5 @@ class Colaborador
         }
     }
 }
+
+?>

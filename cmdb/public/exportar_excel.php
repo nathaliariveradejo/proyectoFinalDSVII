@@ -15,12 +15,12 @@ if ($categoria) {
     $equipos = $model->listar();
 }
 
-// Crear hoja de cálculo
+// Esto crea la hoja de cálculo
 $spreadsheet = new Spreadsheet();
 $sheet = $spreadsheet->getActiveSheet();
 $sheet->setTitle('Inventario');
 
-// Encabezados
+// Los titulos
 $encabezados = ['ID', 'Equipo', 'Marca', 'Serie', 'Ingreso', 'Costo', 'Estado', 'Categoría'];
 $col = 'A';
 foreach ($encabezados as $titulo) {
@@ -42,7 +42,7 @@ foreach ($equipos as $equipo) {
     $fila++;
 }
 
-// Descargar
+// Pa' descargar
 $nombreArchivo = 'inventario_' . ($categoria ? $categoria . '_' : 'completo_') . date('Ymd_His') . '.xlsx';
 
 header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
